@@ -80,7 +80,7 @@ def interactive_test_tk(models, test_image_path, output_dir, grid_size, reshape_
     # Initialize Tkinter window
     root = tk.Tk()
     root.title("Interactive Model Test")
-    root.geometry("400x200")
+    root.geometry("800x400")
 
     # Image panel
     current_panel = tk.Label(root)
@@ -115,8 +115,8 @@ def interactive_test_tk(models, test_image_path, output_dir, grid_size, reshape_
         reconstructed_image_pil = Image.fromarray((reconstructed_image * 255).astype(np.uint8))
 
         # Update Tkinter image panels
-        current_img_tk = ImageTk.PhotoImage(current_image_pil.resize((400, 400)))
-        reconstructed_img_tk = ImageTk.PhotoImage(reconstructed_image_pil.resize((400, 400)))
+        current_img_tk = ImageTk.PhotoImage(current_image_pil.resize((200, 200)))
+        reconstructed_img_tk = ImageTk.PhotoImage(reconstructed_image_pil.resize((200, 200)))
 
         current_panel.configure(image=current_img_tk)
         current_panel.image = current_img_tk
@@ -140,22 +140,22 @@ def interactive_test_tk(models, test_image_path, output_dir, grid_size, reshape_
 
     def auto_press():
         global last_key
-        last_w_press_time = time.time()  # Track the last time 'w' was pressed
+        last_w_press_time = time.time()  # Track the last time 'w' or 's' was pressed
         
         while True:
             time.sleep(0.1)  # Check every 0.1 seconds
 
-            # Reset last_key to None every 0.1 seconds
-            last_key = None
+            # If 'w' or 's' is detected, update the image with a 0.1-second delay
+            if last_key in ['w', 's']:
+                if time.time() - last_w_press_time >= 0.1:  # Ensure 0.1 seconds have passed
+                    update_images(last_key)  # Call update_images with the last key
+                    last_w_press_time = time.time()  # Reset the timer
+                    last_key = None  # Reset last_key to prevent repeated updates
 
-            # Check if 'w' was pressed recently
-            if last_key == 'w':
-                last_w_press_time = time.time()  # Update the last press time
-                update_images('w')
-
-            # If 'w' hasn't been pressed for 0.1 seconds, default to 's'
+            # If no key is detected within 0.1 seconds, default to 's'
             elif time.time() - last_w_press_time > 0.1:
                 update_images('s')
+                last_w_press_time = time.time()  # Reset the timer
 
     def on_key_press(event):
         global last_key
@@ -164,7 +164,6 @@ def interactive_test_tk(models, test_image_path, output_dir, grid_size, reshape_
             root.destroy()
         elif key in models:
             last_key = key  # Update the last detected key
-            update_images(key)
 
     # Start auto-press thread
     auto_press_thread = threading.Thread(target=auto_press, daemon=True)
@@ -175,11 +174,11 @@ def interactive_test_tk(models, test_image_path, output_dir, grid_size, reshape_
 
 # Script Execution
 if __name__ == "__main__":
-    test_image_path = "1 copy 28.png"  # Path to a test image
+    test_image_path = "1 copy 29.png"  # Path to a test image
     model_files = {
-        'w': "fall.json",
+        'w': "jump.json",
         'a': "a.json",
-        's': "jump.json",
+        's': "fall.json",
         'd': "d.json"
     }
     output_dir = "generated"  # Output directory for saving generated images
