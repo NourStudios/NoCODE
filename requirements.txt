@@ -3,4 +3,4 @@ numpy
 tkinter
 json
 pygame
-opencv
+opencv-python
