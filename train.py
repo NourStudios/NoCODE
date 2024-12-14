@@ -221,10 +221,10 @@ def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes,
     print(f"Model trained and saved to {model_file}.")
 
 if __name__ == "__main__":
-    data_folder = "fall"  # Folder containing clean images
+    data_folder = "fall"
     model_file = "fall.json"  # Output model file
     reshape_size = (28, 28)  # Resize images to 28x28
-    grid_sizes = [2, 2]  # Grid size (7x7 for 196 features)
+    grid_sizes = [2, 2]  # Grid size
     hidden_sizes = []  # Example hidden layer sizes
     learning_rate = 0.001  # Learning rate
     iterations = 300  # Number of iterations
