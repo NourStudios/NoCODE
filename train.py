@@ -145,8 +145,9 @@ if __name__ == "__main__":
     model_file = "fall.json"
     reshape_size = (28, 28)
     grid_sizes = [2, 2]
-    hidden_sizes = [1000, 1000]  # hierarchical mechanics/motion/object learning
+    hidden_sizes = [1000, 1000] 
     learning_rate = 0.001
     iterations = 10000
 
     train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, learning_rate, iterations)
+
