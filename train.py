@@ -77,77 +77,134 @@ def backward_propagation_batch(activations, weights, biases, target_output, lear
         weights[i] -= learning_rate * grad_w
         biases[i] -= learning_rate * grad_b
 
+import os
+import numpy as np
+import json
+from PIL import Image
+import re
+# ... (all helper functions: natural_sort_key, get_brightness_values, max_pool, extract_grid_features, etc. remain the same) ...
 
-def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, learning_rate, iterations):
+
+def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, learning_rate, iterations, num_input_frames):
+    """
+    Trains the model using a sequence of num_input_frames to predict a subsequent frame.
+    The targets are restricted to even-indexed frames (2, 4, 6, 8, ...).
+    """
     print(f"Training model using data from folder: {data_folder}")
+    print(f"Using {num_input_frames} preceding frames as input.")
+    print("Targets are restricted to even-indexed frames (2, 4, 6, 8, ...).")
 
     file_list = sorted(os.listdir(data_folder), key=natural_sort_key)
     inputs, targets = [], []
+    processed_features = [] # To store the features of each frame
 
-    skipped_files, processed_files = [], []
+    # 1. Pre-process and extract features for all valid frames
+    valid_file_list = []
+    for file_name in file_list:
+        file_path = os.path.join(data_folder, file_name)
+        if file_path.lower().endswith(('.png', '.jpg', '.jpeg')):
+            brightness = get_brightness_values(file_path, reshape_size)
+            if brightness is not None:
+                # Store both pooled (input) and gridded (target) features for every frame
+                pooled = max_pool(brightness) 
+                gridded = extract_grid_features(brightness, grid_sizes)
+                
+                processed_features.append({
+                    'pooled': pooled,
+                    'gridded': gridded
+                })
+                valid_file_list.append(file_name)
 
-    for i in range(0, len(file_list) - 1, 2):
-        current_file_path = os.path.join(data_folder, file_list[i])
-        next_file_path = os.path.join(data_folder, file_list[i+1])
+    num_valid_frames = len(processed_features)
+    min_required_frames = num_input_frames + 1
+    
+    print(f"\nProcessed features for {num_valid_frames} valid images.")
+    if num_valid_frames < min_required_frames:
+        print(f"Not enough valid image frames for training. Need at least {min_required_frames}. Aborting.")
+        return
 
-        if not current_file_path.lower().endswith(('.png', '.jpg', '.jpeg')):
-            skipped_files.append(current_file_path)
+    # 2. Create input/target sequences with even-index target restriction
+    
+    # We loop through the entire list, but ONLY use the even indices (1, 3, 5, 7, ...) as the target frame index.
+    # The actual frame indices (0-based) for the targets are 1, 3, 5, 7, ...
+    # This corresponds to file names 2.png, 4.png, 6.png, 8.png, ...
+
+    # The loop iterates on the target frame index (i)
+    # Start at the first even index (1) and step by 2
+    for i in range(1, num_valid_frames, 2):
+        # 1. Define the Target (Target frame is at index i, which is 1, 3, 5, ...)
+        # The target feature is the gridded feature of the even-indexed frame.
+        target_frame_index = i
+        targets.append(processed_features[target_frame_index]['gridded'])
+        
+        # 2. Define the Input Sequence (N frames preceding the target frame)
+        # The sequence starts at index: i - num_input_frames
+        # The sequence ends at index: i - 1
+        sequence_start_index = i - num_input_frames
+        sequence_end_index = i # The slice will go up to but not include this index
+
+        # If the start of the sequence goes before the first frame (index 0), we must skip this sample
+        if sequence_start_index < 0:
+            print(f"Skipping target frame at index {i} ('{valid_file_list[i]}') because the required sequence of {num_input_frames} frames is not available.")
+            targets.pop() # Remove the target we just appended
             continue
-        if not next_file_path.lower().endswith(('.png', '.jpg', '.jpeg')):
-            skipped_files.append(next_file_path)
-            continue
+        
+        # Concatenate the 'pooled' features for the input sequence
+        input_sequence = [processed_features[j]['pooled'] 
+                          for j in range(sequence_start_index, sequence_end_index)]
+            
+        inputs.append(np.concatenate(input_sequence))
 
-        current_brightness = get_brightness_values(current_file_path, reshape_size)
-        next_brightness = get_brightness_values(next_file_path, reshape_size)
-        if current_brightness is None or next_brightness is None:
-            skipped_files.extend([current_file_path, next_file_path])
-            continue
 
-        pooled_image = max_pool(current_brightness)
-        next_features = extract_grid_features(next_brightness, grid_sizes)
-
-        inputs.append(pooled_image)
-        targets.append(next_features)
-        processed_files.append((current_file_path, next_file_path))
-
-    print(f"\nProcessed {len(processed_files)} file pairs.")
-    print(f"Skipped {len(skipped_files)} files.")
-
-    if len(inputs) < 2:
-        print("Not enough valid image pairs for training. Aborting.")
+    num_pairs = len(inputs)
+    print(f"Created {num_pairs} training pairs.")
+    if num_pairs == 0:
+        print("No training pairs created. Aborting.")
         return
 
     inputs = np.array(inputs, dtype=np.float32)
     targets = np.array(targets, dtype=np.float32)
 
-    input_size = inputs.shape[1]
+    # The input size is now N * (size of a single frame's pooled feature)
+    input_size = inputs.shape[1] 
     output_size = targets.shape[1]
+    
+    # Check if input size is consistent with num_input_frames
+    expected_single_pooled_size = processed_features[0]['pooled'].size
+    if input_size != num_input_frames * expected_single_pooled_size:
+        raise ValueError("Calculated input size mismatch. Check feature extraction logic.")
+
     weights, biases = initialize_weights_and_biases(input_size, hidden_sizes, output_size)
 
+    # 3. Training Loop and Model Saving (remains the same)
     for iteration in range(iterations):
         activations = forward_propagation_batch(inputs, weights, biases)
         backward_propagation_batch(activations, weights, biases, targets, learning_rate)
 
-        if iteration % 10 == 0:
+        if iteration % 1000 == 0 or iteration == iterations - 1:
             loss = np.mean((activations[-1] - targets) ** 2)
             print(f"Iteration {iteration}, Loss: {loss:.4f}")
 
     model_data = {'weights': [w.tolist() for w in weights],
-                  'biases': [b.tolist() for b in biases]}
+                  'biases': [b.tolist() for b in biases],
+                  'config': {'num_input_frames': num_input_frames,
+                             'reshape_size': reshape_size,
+                             'grid_sizes': grid_sizes}}
     with open(model_file, 'w') as f:
         json.dump(model_data, f, indent=2)
 
-    print(f"Model trained and saved to {model_file}.")
+    print(f"Model trained and saved to {model_file}")
 
 
 if __name__ == "__main__":
     data_folder = "fall"
-    model_file = "fall.json"
+    model_file = "fall_sequence_odd_target.json"
     reshape_size = (28, 28)
     grid_sizes = [2, 2]
-    hidden_sizes = [1000, 1000] 
+    hidden_sizes = [1000, 1000]
     learning_rate = 0.001
     iterations = 10000
+    num_input_frames = 3 # Example: Use 3 preceding frames
 
-    train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, learning_rate, iterations)
-
+    train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, 
+                learning_rate, iterations, num_input_frames=num_input_frames)
