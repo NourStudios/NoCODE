@@ -204,7 +204,8 @@ if __name__ == "__main__":
     hidden_sizes = [1000, 1000]
     learning_rate = 0.001
     iterations = 10000
-    num_input_frames = 3 # Example: Use 3 preceding frames
+    num_input_frames = 3 
 
     train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, 
+
                 learning_rate, iterations, num_input_frames=num_input_frames)
