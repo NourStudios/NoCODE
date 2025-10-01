@@ -77,13 +77,6 @@ def backward_propagation_batch(activations, weights, biases, target_output, lear
         weights[i] -= learning_rate * grad_w
         biases[i] -= learning_rate * grad_b
 
-import os
-import numpy as np
-import json
-from PIL import Image
-import re
-# ... (all helper functions: natural_sort_key, get_brightness_values, max_pool, extract_grid_features, etc. remain the same) ...
-
 
 def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, learning_rate, iterations, num_input_frames):
     """
@@ -209,3 +202,4 @@ if __name__ == "__main__":
     train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, 
 
                 learning_rate, iterations, num_input_frames=num_input_frames)
+
