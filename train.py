@@ -4,9 +4,6 @@ import json
 from PIL import Image
 import re
 
-# -------------------------------
-# Utilities
-# -------------------------------
 def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
 
@@ -29,9 +26,6 @@ def extract_grid_features(image_array, grid_size):
     features = features.transpose(0, 2, 1, 3).reshape(num_y*num_x, gh*gw)
     return features.flatten().astype(np.float32)
 
-# -------------------------------
-# Optimizer with LR decay + clip
-# -------------------------------
 class AdamOpt:
     def __init__(self, weights, biases, lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8, clip_value=1.0, decay=0.9995):
         self.lr, self.beta1, self.beta2, self.eps = lr, beta1, beta2, eps
@@ -66,9 +60,6 @@ class AdamOpt:
             v_hat_b = self.v_b[i] / (1 - self.beta2 ** self.t)
             biases[i] -= self.lr * m_hat_b / (np.sqrt(v_hat_b + self.eps))
 
-# -------------------------------
-# Model functions
-# -------------------------------
 def initialize_weights_and_biases(input_size, hidden_sizes, output_size):
     weights, biases = [], []
     layer_sizes = [input_size] + hidden_sizes + [output_size]
@@ -104,9 +95,6 @@ def backward(acts, weights, target):
         grads_b.append(np.mean(deltas[i], axis=0))
     return grads_w, grads_b
 
-# -------------------------------
-# Patch weighting (neighbor/global)
-# -------------------------------
 def patch_consistency(inputs, targets):
     """
     Measures how consistent patches are.
@@ -117,16 +105,12 @@ def patch_consistency(inputs, targets):
     var_t = np.mean((targets - mean_t) ** 2, axis=0)
     return var_t / (np.max(var_t) + 1e-8)  # normalize [0..1]
 
-# -------------------------------
 # Training
-# -------------------------------
 def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes, lr, iterations, num_input_frames, batch_size=32):
     file_list = sorted(os.listdir(data_folder), key=natural_sort_key)
     processed = []
 
-    # -------------------------------
     # Preprocess frames
-    # -------------------------------
     for f in file_list:
         if f.lower().endswith(('.png','.jpg','.jpeg')):
             arr = get_brightness_values(os.path.join(data_folder, f), reshape_size)
@@ -145,16 +129,9 @@ def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes,
 
     inputs, targets = np.array(inputs, np.float32), np.array(targets, np.float32)
     input_size, output_size = inputs.shape[1], targets.shape[1]
-
-    # -------------------------------
-    # Initialize model
-    # -------------------------------
     weights, biases = initialize_weights_and_biases(input_size, hidden_sizes, output_size)
     opt = AdamOpt(weights, biases, lr)
 
-    # -------------------------------
-    # Compute adaptive patch dependency weights
-    # -------------------------------
     def compute_patch_dependency(inputs, targets):
         """
         Returns weights per output patch (0=global, 1=local)
@@ -177,9 +154,6 @@ def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes,
 
     dependency_weights = compute_patch_dependency(inputs, targets)
 
-    # -------------------------------
-    # Training loop
-    # -------------------------------
     for it in range(iterations):
         idx = np.random.choice(len(inputs), batch_size, replace=False)
         x, y = inputs[idx], targets[idx]
@@ -197,9 +171,6 @@ def train_model(data_folder, model_file, reshape_size, grid_sizes, hidden_sizes,
         if it % 1 == 0 or it == iterations-1:
             print(f"Iter {it}, Loss {loss:.6f}, LR {opt.lr:.6e}")
 
-    # -------------------------------
-    # Save model
-    # -------------------------------
     model = {
         'weights': [w.tolist() for w in weights],
         'biases': [b.tolist() for b in biases],
@@ -236,3 +207,4 @@ if __name__ == "__main__":
         num_input_frames=num_input_frames,
         batch_size=batch_size
     )
+
